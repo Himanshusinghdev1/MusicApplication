@@ -1,69 +1,114 @@
-let currentTrackIndex = 0;
-let playlistTracks = [];
+// Spotify Access Token (Fetch dynamically or replace with your method)
+const accessToken = localStorage.getItem("spotifyAccessToken") || "BQCldSg_afuox8CRGXCUkrCF60fZ-noYCaIP1Iqm6M82TP_d_KbFqEpVc02uYlmJkp5ObkZvbKcH_QXmLm2ia7rEpDXjyXHxbXOum4rQYoYstGx_w3w";
+
+// Elements
+const trackListElement = document.getElementById("track-list");
 const audioPlayer = new Audio();
-const volumeControl = document.getElementById("volume-control");
+const trackTitle = document.getElementById("track-title");
+const trackArtist = document.getElementById("track-artist");
+const trackCover = document.getElementById("track-cover");
+const playPauseButton = document.getElementById("play-pause-btn");
+
+// Current Track State
+let currentTrackIndex = 0;
+let tracks = [];
+
+// Load Playlist and Populate UI
+async function loadPlaylist(playlistId) {
+    tracks = await fetchAllPlaylistTracks(playlistId, accessToken);
+
+    // Clear existing tracks
+    trackListElement.innerHTML = "";
+
+    // Populate the playlist UI
+    tracks.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+            <img src="${item.track.album.images[0].url}" class="track-cover-small" alt="Cover">
+            <span>${item.track.name} - ${item.track.artists[0].name}</span>
+        `;
+        li.onclick = () => playTrack(index); // Set track click listener
+        trackListElement.appendChild(li);
+    });
+
+    // Play the first track by default
+    if (tracks.length > 0) playTrack(0);
+}
+
+// Play Track by Index
+function playTrack(index) {
+    currentTrackIndex = index;
+    const track = tracks[index].track;
+
+    // Update Player UI
+    trackTitle.textContent = track.name;
+    trackArtist.textContent = track.artists[0].name;
+    trackCover.src = track.album.images[0].url;
+    audioPlayer.src = track.preview_url;
+
+    // Play the track
+    audioPlayer.play();
+    playPauseButton.textContent = "Pause";
+}
+
+// Play/Pause Toggle
+playPauseButton.onclick = () => {
+    if (audioPlayer.paused) {
+        audioPlayer.play();
+        playPauseButton.textContent = "Pause";
+    } else {
+        audioPlayer.pause();
+        playPauseButton.textContent = "Play";
+    }
+};
+
+// Next and Previous Track Navigation
+document.getElementById("next-btn").onclick = () => {
+    if (currentTrackIndex < tracks.length - 1) playTrack(currentTrackIndex + 1);
+};
+
+document.getElementById("prev-btn").onclick = () => {
+    if (currentTrackIndex > 0) playTrack(currentTrackIndex - 1);
+};
+
+// Volume Control
+document.getElementById("volume-control").oninput = (event) => {
+    audioPlayer.volume = event.target.value;
+};
+
+// Example: Load a Spotify Playlist (Replace with your playlist ID)
+loadPlaylist("37i9dQZF1DXcBWIGoYBM5M");
+
+// adding code for dark mode
+document.addEventListener("DOMContentLoaded", () => {
+    const themeToggle = document.getElementById("theme-toggle");
+    const body = document.body;
+
+    // Check for saved theme in localStorage
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "light") {
+        body.classList.add("light-mode");
+        themeToggle.textContent = "Switch to Dark Mode";
+    }
+
+    // Toggle theme on button click
+    themeToggle.addEventListener("click", () => {
+        body.classList.toggle("light-mode");
+
+        // Update button text
+        if (body.classList.contains("light-mode")) {
+            themeToggle.textContent = "Switch to Dark Mode";
+            localStorage.setItem("theme", "light");
+        } else {
+            themeToggle.textContent = "Switch to Light Mode";
+            localStorage.setItem("theme", "dark");
+        }
+    });
+});
+
 const seekBar = document.getElementById("seek-bar");
 const currentTimeEl = document.getElementById("current-time");
 const durationEl = document.getElementById("duration");
-
-// Load Playlist
-async function loadPlaylist() {
-    const tracks = await fetchPlaylistTracks("3cEYpjA9oz9GiPac4AsH4n");
-    playlistTracks = tracks.map(item => item.track);
-    displayPlaylist();
-    loadTrack(0);
-}
-
-// Display Playlist
-function displayPlaylist() {
-    const trackList = document.getElementById("track-list");
-    trackList.innerHTML = "";
-    playlistTracks.forEach((track, index) => {
-        const listItem = document.createElement("li");
-        listItem.innerHTML = `
-            <img src="${track.album.images[0]?.url}" alt="${track.name}" class="track-cover-small">
-            <div>${track.name} - ${track.artists.map(artist => artist.name).join(", ")}</div>
-        `;
-        listItem.addEventListener("click", () => loadTrack(index));
-        trackList.appendChild(listItem);
-    });
-}
-
-// Load Track
-function loadTrack(index) {
-    currentTrackIndex = index;
-    const track = playlistTracks[index];
-    document.getElementById("track-cover").src = track.album.images[0]?.url;
-    document.getElementById("track-title").textContent = track.name;
-    document.getElementById("track-artist").textContent = track.artists.map(artist => artist.name).join(", ");
-    audioPlayer.src = track.preview_url;
-    audioPlayer.pause();
-}
-
-// Play or Pause Track
-function togglePlayPause() {
-    if (audioPlayer.paused) {
-        audioPlayer.play();
-        document.getElementById("play-pause-btn").textContent = "Pause";
-    } else {
-        audioPlayer.pause();
-        document.getElementById("play-pause-btn").textContent = "Play";
-    }
-}
-
-// Next or Previous Track
-function changeTrack(step) {
-    const newIndex = (currentTrackIndex + step + playlistTracks.length) % playlistTracks.length;
-    loadTrack(newIndex);
-    audioPlayer.play();
-    document.getElementById("play-pause-btn").textContent = "Pause";
-}
-
-// Update Volume
-volumeControl.addEventListener("input", (e) => {
-    audioPlayer.volume = e.target.value;
-});
-
 // Update Progress
 audioPlayer.addEventListener("timeupdate", () => {
     seekBar.value = (audioPlayer.currentTime / audioPlayer.duration) * 100;
@@ -82,11 +127,3 @@ function formatTime(seconds) {
     const secs = Math.floor(seconds % 60);
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
 }
-
-// Event Listeners
-document.getElementById("play-pause-btn").addEventListener("click", togglePlayPause);
-document.getElementById("prev-btn").addEventListener("click", () => changeTrack(-1));
-document.getElementById("next-btn").addEventListener("click", () => changeTrack(1));
-
-// Load the Playlist
-loadPlaylist();
